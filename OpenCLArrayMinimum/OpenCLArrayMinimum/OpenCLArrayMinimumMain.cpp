@@ -61,7 +61,7 @@ namespace ArrayMinimum
 
 		// 最大値と最小値
 		const cl_float minValue = -0;
-		const cl_float maxValue = +1000;
+		const cl_float maxValue = +10000;
 
 /*****************/
 		// 要素数を表示
@@ -107,12 +107,17 @@ namespace ArrayMinimum
 
 		// 最小値を入力値の最初の値で設定
 		outputCPU = input[0];
-
+		int t = 0;
 		// 全要素について
 		for(cl_uint i = 1; i < elementCount; i++)
 		{
 			// 小さい方を最小値にする
 			outputCPU = min(outputCPU, input[i]);
+
+			if(outputCPU == input[i])
+			{
+				t = i;
+			}
 		}
 		cout << " - " << timer.elapsed() << "[s]" << endl;
 	
@@ -245,28 +250,20 @@ namespace ArrayMinimum
 /*****************/
 		cout << "# カーネルの実行" << endl;
 
-		// カーネル実行のイベント
-		cl::Event kernelEvent;
-
 		// カーネルを実行
-		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(elementCount, elementCount), cl::NullRange, NULL, &kernelEvent);
-
-		// 実行終了まで待機
-		kernelEvent.wait();
+		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(elementCount), cl::NullRange);
 
 /*****************/
 		cout << "# デバイスからデータを読み込み" << endl;
 
-		// 出力待機イベント
-		cl::Event readEvent;
-
 		// 同期で出力値に読み込み
-		queue.enqueueReadBuffer(bufferValues, CL_FALSE, 0, sizeof(cl_float), &outputCL, NULL, &readEvent);
-
-		// 読み込み完了まで待機
-		readEvent.wait();
+		queue.enqueueReadBuffer(bufferValues, CL_TRUE, 0, sizeof(cl_float), &outputCL);
 
 		cout << "#: " << timer.elapsed() << "[s]" << endl;
+
+		cl_float* debug = new cl_float[elementCount];
+		queue.enqueueReadBuffer(bufferValues, CL_TRUE, 0, sizeof(cl_float)*elementCount, debug);
+		cout << debug[t];
 
 /*****************/
 		cout << endl
