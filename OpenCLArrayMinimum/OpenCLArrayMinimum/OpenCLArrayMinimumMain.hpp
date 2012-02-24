@@ -1,14 +1,14 @@
-﻿#ifndef ARRAYNEAR_ARRAYNEARMAIN_INCLUDED
-#define ARRAYNEAR_ARRAYNEARMAIN_INCLUDED
+﻿#ifndef ARRAYNEAR_ARRAYMINIMUMMAIN_INCLUDED
+#define ARRAYNEAR_ARRAYMINIMUMMAIN_INCLUDED
 
 // OpenCL関連の例外を有効化
 #define __CL_ENABLE_EXCEPTIONS
 
-//! ArrayNearに関する名前空間
-namespace ArrayNear
+//! ArrayMinimumに関する名前空間
+namespace ArrayMinimum
 {
 	//! アプリケーション本体
-	class ArrayNearMain
+	class ArrayMinimumMain
 	{
 	public:
 		//! アプリケーションを実行する

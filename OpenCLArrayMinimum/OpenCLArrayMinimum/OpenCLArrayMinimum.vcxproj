@@ -13,19 +13,19 @@
   <ItemGroup>
     <ClCompile Include="Exception.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="OpenCLArrayNearMain.cpp" />
+    <ClCompile Include="OpenCLArrayMinimumMain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Exception.hpp" />
-    <ClInclude Include="OpenCLArrayNearMain.hpp" />
+    <ClInclude Include="OpenCLArrayMinimumMain.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="ArrayNear.cl" />
+    <None Include="ArrayMinimum.cl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{64704A93-12F7-416E-994D-3EF181384C1B}</ProjectGuid>
     <RootNamespace>GpuedDem</RootNamespace>
-    <ProjectName>OpenCLArrayNear</ProjectName>
+    <ProjectName>OpenCLArrayMinimum</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

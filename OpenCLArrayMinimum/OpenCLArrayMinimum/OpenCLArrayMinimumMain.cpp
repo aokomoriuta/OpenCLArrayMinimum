@@ -1,4 +1,4 @@
-﻿#include "OpenCLArrayNearMain.hpp"
+﻿#include "OpenCLArrayMinimumMain.hpp"
 
 #include <iostream>
 #include <vector>
@@ -17,15 +17,15 @@ using std::endl;
 using std::vector;
 using std::string;
 
-namespace ArrayNear
+namespace ArrayMinimum
 {
 	//! アプリケーションを実行する
-	int ArrayNearMain::Main()
+	int ArrayMinimumMain::Main()
 	{
 		try
 		{
 			// 計算を実行
-			ArrayNearMain::Compute();
+			ArrayMinimumMain::Compute();
 		}
 		catch(cl::Error error)
 		{
@@ -45,27 +45,23 @@ namespace ArrayNear
 	}
 
 	//! 計算する
-	void ArrayNearMain::Compute()
+	void ArrayMinimumMain::Compute()
 	{
 		// 実行開始
-		cout << "= しきい値テスト =" << endl;
+		cout << "= 最小値テスト =" << endl;
 
 		// OpenCL Cソースファイル名
-		const string filepath = "ArrayNear.cl";
+		const string filepath = "ArrayMinimum.cl";
 
 		// エントリポイント名
-		const string entryPoint = "ArrayNear";
+		const string entryPoint = "ArrayMinimum";
 
 		// ベクトルの要素数
-		const cl_uint elementCount = 10000;
-		const cl_uint maxNearCount = 10;
+		const cl_uint elementCount = 7000;
 
 		// 最大値と最小値
-		const cl_float minValue = -10000;
-		const cl_float maxValue = +10000;
-
-		// しきい値
-		const cl_float threshold = 0.0001f;
+		const cl_float minValue = -0;
+		const cl_float maxValue = +1000;
 
 /*****************/
 		// 要素数を表示
@@ -81,22 +77,25 @@ namespace ArrayNear
 		cl_float* input = new cl_float[elementCount]; 
 
 		// 乱数生成器の作成
-		boost::variate_generator<boost::minstd_rand&, boost::uniform_real<cl_float>> random(
-			boost::minstd_rand(42),
-			boost::uniform_real<cl_float>(minValue, maxValue));
+		boost::minstd_rand gen(42);
+		boost::uniform_real<> dst(minValue, maxValue);
+		boost::variate_generator<
+			boost::minstd_rand&, boost::uniform_real<>
+		> random(gen, dst);
+		random();
 
 		// 全要素について
 		for(cl_uint i = 0; i < elementCount; i++)
 		{
 			// 入力値をランダムで与える
-			input[i] = random();
+			input[i] = (cl_float)random();
 		}
 
 		// OpenCL用出力
-		cl_int* outputCL = new cl_int[elementCount * maxNearCount];
+		cl_float outputCL;
 
 		// CPU用出力
-		cl_int* outputCPU = new cl_int[elementCount * maxNearCount];
+		cl_float outputCPU;
 
 		// タイマーで時間測定
 		boost::timer timer = boost::timer();
@@ -105,48 +104,15 @@ namespace ArrayNear
 /*****************/
 		cout << "# CPUの計算";
 		timer.restart();
-		
-		// 全要素について
-		for(cl_uint i = 0; i < elementCount; i++)
-		{
-			// 全近傍について
-			for(cl_uint j = 0; j < maxNearCount; j++)
-			{
-				// 出力値を-1で初期化
-				outputCPU[i*maxNearCount + j] = -1;
-			}
-		}
+
+		// 最小値を入力値の最初の値で設定
+		outputCPU = input[0];
 
 		// 全要素について
-		for(cl_uint i = 0; i < elementCount; i++)
+		for(cl_uint i = 1; i < elementCount; i++)
 		{
-			// この要素の近傍要素数を初期化
-			cl_uint nearCount = 0;
-
-			// 他の要素に対して
-			for(cl_uint j = 0; j < elementCount; j++)
-			{
-				// 自分以外に対して
-				if(i != j)
-				{
-					// 相手との差が小さければ
-					if(abs(input[i] - input[j]) < threshold)
-					{
-						// 出力値に要素番号を追加
-						outputCPU[i*maxNearCount + nearCount] = j;
-
-						// 近傍要素数を増やす
-						nearCount++;
-
-						// 近傍要素数が最大値に達したら
-						if(nearCount > maxNearCount)
-						{
-							// 例外
-							throw "近傍要素数の最大値に達しました";
-						}
-					}
-				}
-			}
+			// 小さい方を最小値にする
+			outputCPU = min(outputCPU, input[i]);
 		}
 		cout << " - " << timer.elapsed() << "[s]" << endl;
 	
@@ -189,11 +155,8 @@ namespace ArrayNear
 /*****************/
 		cout << "# バッファーの作成" << endl;
 
-		// 入力のバッファーを読み込み専用で作成
-		cl::Buffer bufferInput = cl::Buffer(context, CL_MEM_READ_ONLY, sizeof(cl_float) * elementCount);
-
-		// 出力のバッファーを書きこみ専用で作成
-		cl::Buffer bufferOutput = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(cl_int) * elementCount*maxNearCount);
+		// バッファーを読み書き可能にして作成
+		cl::Buffer bufferValues = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(cl_float) * elementCount);
 
 
 /*****************/
@@ -266,15 +229,9 @@ namespace ArrayNear
 
 		// 引数を設定
 		// # 入力配列の要素数
-		// # 近傍要素数の最大値
 		// # 入力配列
-		// # 出力配列
-		// # しきい値
 		kernel.setArg(0, elementCount);
-		kernel.setArg(1, maxNearCount);
-		kernel.setArg(2, bufferInput);
-		kernel.setArg(3, bufferOutput);
-		kernel.setArg(4, threshold);
+		kernel.setArg(1, bufferValues);
 
 /*****************/
 		cout << endl
@@ -283,7 +240,7 @@ namespace ArrayNear
 		timer.restart();
 
 		// 非同期で入力値を書き込み
-		queue.enqueueWriteBuffer(bufferInput, CL_FALSE, 0, sizeof(cl_float) * elementCount, input);
+		queue.enqueueWriteBuffer(bufferValues, CL_FALSE, 0, sizeof(cl_float) * elementCount, input);
 
 /*****************/
 		cout << "# カーネルの実行" << endl;
@@ -304,7 +261,7 @@ namespace ArrayNear
 		cl::Event readEvent;
 
 		// 同期で出力値に読み込み
-		queue.enqueueReadBuffer(bufferOutput, CL_FALSE, 0, sizeof(cl_int) * elementCount*maxNearCount, outputCL, NULL, &readEvent);
+		queue.enqueueReadBuffer(bufferValues, CL_FALSE, 0, sizeof(cl_float), &outputCL, NULL, &readEvent);
 
 		// 読み込み完了まで待機
 		readEvent.wait();
@@ -314,45 +271,12 @@ namespace ArrayNear
 /*****************/
 		cout << endl
 			 << "== 結果 == " << endl
-			 << "# CLでの計算" << endl;
-
-		// 全出力値について
-		for(cl_uint i = 0; i < elementCount; i++)
-		{
-			for(cl_uint j = 0; j < maxNearCount; j++)
-			{
-				// 近傍が存在すれば
-				if(outputCL[i*maxNearCount + j] != -1)
-				{
-					// 計算結果を表示
-					cout << "* " << i << " : " << outputCL[i*maxNearCount + j] << " (" << input[i] << " : " << input[outputCL[i*maxNearCount + j]] << ")" << endl;
-				}
-			}
-		}
-
-
-
-		cout << "# CPUでの計算" << endl;
-
-		// 全出力値について
-		for(cl_uint i = 0; i < elementCount; i++)
-		{
-			for(cl_uint j = 0; j < maxNearCount; j++)
-			{
-				// 近傍が存在すれば
-				if(outputCPU[i*maxNearCount + j] != -1)
-				{
-					// 計算結果を表示
-					cout << "* " << i << " : " << outputCPU[i*maxNearCount + j] << " (" << input[i] << " : " << input[outputCPU[i*maxNearCount + j]] << ")" << endl;
-				}
-			}
-		}
+			 << "# CLでの計算  = " << outputCL << endl
+			 << "# CPUでの計算 = " << outputCPU << endl;
 
 
 /*****************/
 		delete[] input;
-		delete[] outputCPU;
-		delete[] outputCL;
 	}
 }
 #undef foreach
