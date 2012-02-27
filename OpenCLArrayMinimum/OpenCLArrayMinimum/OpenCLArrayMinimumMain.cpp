@@ -57,7 +57,7 @@ namespace ArrayMinimum
 		const string entryPoint = "ArrayMinimum";
 
 		// ベクトルの要素数
-		const cl_uint elementCount = 7000;
+		const cl_uint elementCount = 123456789;
 
 		// 最大値と最小値
 		const cl_float minValue = -0;
@@ -107,17 +107,12 @@ namespace ArrayMinimum
 
 		// 最小値を入力値の最初の値で設定
 		outputCPU = input[0];
-		int t = 0;
+
 		// 全要素について
 		for(cl_uint i = 1; i < elementCount; i++)
 		{
 			// 小さい方を最小値にする
 			outputCPU = min(outputCPU, input[i]);
-
-			if(outputCPU == input[i])
-			{
-				t = i;
-			}
 		}
 		cout << " - " << timer.elapsed() << "[s]" << endl;
 	
@@ -130,6 +125,10 @@ namespace ArrayMinimum
 
 		// 先頭のプラットフォームを取得
 		cl::Platform platform = platforms[0];
+
+		// 情報を表示
+		cout << "#* プラットフォーム名：" << platform.getInfo<CL_PLATFORM_NAME>() << endl
+		     << "#* OpenCLバージョン：" << platform.getInfo<CL_PLATFORM_VERSION>() << endl;
 
 
 /*****************/
@@ -160,8 +159,11 @@ namespace ArrayMinimum
 /*****************/
 		cout << "# バッファーの作成" << endl;
 
-		// バッファーを読み書き可能にして作成
+		// データ転送用バッファーを読み書き可能にして作成
 		cl::Buffer bufferValues = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(cl_float) * elementCount);
+
+		// グループ数を取得する用バッファーを書きのみにして作成
+		cl::Buffer bufferGroupCount = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(cl_uint));
 
 
 /*****************/
@@ -213,15 +215,6 @@ namespace ArrayMinimum
 		cl::Kernel kernel = cl::Kernel(program, entryPoint.c_str());
 
 /*****************/
-		cout << "# 引数を設定" << endl;
-
-		// 引数を設定
-		// # 入力配列の要素数
-		// # 入力配列
-		kernel.setArg(0, elementCount);
-		kernel.setArg(1, bufferValues);
-
-/*****************/
 		cout << endl
 			 << "== 計算の実行 ==" << endl
 		     << "# デバイスにデータを書き込み" << endl;
@@ -231,22 +224,49 @@ namespace ArrayMinimum
 		queue.enqueueWriteBuffer(bufferValues, CL_FALSE, 0, sizeof(cl_float) * elementCount, input);
 
 /*****************/
-		cout << "# カーネルの実行" << endl;
+		cout << "# カーネルを実行" << endl;
 
-		// カーネルを実行
-		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(elementCount), cl::NullRange);
+		// グループ数を初期化
+		cl_uint groupCount = 0;
 
-/*****************/
-		cout << "# デバイスからデータを読み込み" << endl;
+		// グローバルアイテム数を初期化
+		cl_uint globalSize = elementCount;
 
-		// 同期で出力値に読み込み
-		queue.enqueueReadBuffer(bufferValues, CL_TRUE, 0, sizeof(cl_float), &outputCL);
+		// ローカルアイテム数を取得
+		cl_uint localSize = device.getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>()[0];
 
+		// グループ数が1になるまで
+		while(groupCount != 1)
+		{
+			// 今回ののグローバルアイテム数を表示
+			cout << "## " << globalSize << endl;
+
+			// 引数を設定
+			// # 入力配列の要素数
+			// # 入力配列
+			// # ローカルメモリ
+			// # グループ数
+			kernel.setArg(0, globalSize);
+			kernel.setArg(1, bufferValues);
+			kernel.setArg(2, sizeof(cl_float)*localSize, NULL);
+			kernel.setArg(3, bufferGroupCount);
+
+
+			// カーネルを実行
+			//* グローバルアイテム数はローカルアイテム数で割り切れる数のうち最小のもの
+			queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange((ceil(globalSize/(float)localSize))*localSize), cl::NDRange(localSize));
+
+
+			// グループ数を取得
+			queue.enqueueReadBuffer(bufferGroupCount, CL_TRUE, 0, sizeof(groupCount), &groupCount);
+
+			// 次のグローバルアイテム数を設定
+			globalSize = groupCount;
+		}
 		cout << "#: " << timer.elapsed() << "[s]" << endl;
-
-		cl_float* debug = new cl_float[elementCount];
-		queue.enqueueReadBuffer(bufferValues, CL_TRUE, 0, sizeof(cl_float)*elementCount, debug);
-		cout << debug[t];
+		
+		// 結果を読み込み
+		queue.enqueueReadBuffer(bufferValues, CL_TRUE, 0, sizeof(cl_float), &outputCL);
 
 /*****************/
 		cout << endl
@@ -259,4 +279,3 @@ namespace ArrayMinimum
 		delete[] input;
 	}
 }
-#undef foreach
