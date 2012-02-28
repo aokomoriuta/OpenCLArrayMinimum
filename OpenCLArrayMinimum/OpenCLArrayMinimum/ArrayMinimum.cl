@@ -1,6 +1,4 @@
-﻿#pragma OPENCL EXTENSION cl_amd_printf : enable
-
-/* 最小値を探索する */
+﻿/* 最小値を探索する */
 /*!
 	\param elementCount 入力配列の要素数
 	\param values 入力配列
