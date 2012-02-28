@@ -57,7 +57,7 @@ namespace ArrayMinimum
 		const string entryPoint = "ArrayMinimum";
 
 		// ベクトルの要素数
-		const cl_uint elementCount = 123456789;
+		const cl_uint elementCount = 12345678;
 
 		// 最大値と最小値
 		const cl_float minValue = -0;
@@ -126,7 +126,7 @@ namespace ArrayMinimum
 		// 先頭のプラットフォームを取得
 		cl::Platform platform = platforms[0];
 
-		// 情報を表示
+		// プラットフォーム情報を表示
 		cout << "#* プラットフォーム名：" << platform.getInfo<CL_PLATFORM_NAME>() << endl
 		     << "#* OpenCLバージョン：" << platform.getInfo<CL_PLATFORM_VERSION>() << endl;
 
@@ -140,6 +140,11 @@ namespace ArrayMinimum
 
 		// 先頭のデバイスを取得
 		cl::Device device = devices[0];
+
+		// デバイス情報を表示
+		cout << "#* デバイス名：" << device.getInfo<CL_DEVICE_NAME>() << endl
+			 << "#* クロック周波数[MHz]：" << device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>() << endl
+			 << "#* 並列計算コア数：" << device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>() << endl;
 
 
 /*****************/
@@ -226,17 +231,14 @@ namespace ArrayMinimum
 /*****************/
 		cout << "# カーネルを実行" << endl;
 
-		// グループ数を初期化
-		cl_uint groupCount = 0;
-
 		// グローバルアイテム数を初期化
 		cl_uint globalSize = elementCount;
 
 		// ローカルアイテム数を取得
 		cl_uint localSize = device.getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>()[0];
 
-		// グループ数が1になるまで
-		while(groupCount != 1)
+		// グローバルアイテム数が2つ以上あれば
+		while(globalSize > 1)
 		{
 			// 今回ののグローバルアイテム数を表示
 			cout << "## " << globalSize << endl;
@@ -254,14 +256,11 @@ namespace ArrayMinimum
 
 			// カーネルを実行
 			//* グローバルアイテム数はローカルアイテム数で割り切れる数のうち最小のもの
-			queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange((ceil(globalSize/(float)localSize))*localSize), cl::NDRange(localSize));
+			queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange((cl_uint)ceil(globalSize/(float)localSize)*localSize), cl::NDRange(localSize));
 
 
-			// グループ数を取得
-			queue.enqueueReadBuffer(bufferGroupCount, CL_TRUE, 0, sizeof(groupCount), &groupCount);
-
-			// 次のグローバルアイテム数を設定
-			globalSize = groupCount;
+			// 今のグループ数を、次のグローバルアイテム数に設定
+			queue.enqueueReadBuffer(bufferGroupCount, CL_TRUE, 0, sizeof(globalSize), &globalSize);
 		}
 		cout << "#: " << timer.elapsed() << "[s]" << endl;
 		
